@@ -199,14 +199,24 @@ get_angle_lines <- function(line_1, line_2) {
 
 create_strips <- function(field, plot_heading, plot_width, radius) {
   circle <- sf::st_buffer(st_centroid_quietly(field), radius)
-
+  
   strips <-
     sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
     sf::st_as_sf() %>%
     cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
-    dplyr::arrange(X) %>%
-    dplyr::mutate(group = 1:nrow(.)) %>%
+    data.table() %>%
+    .[order(X), ] %>%
+    .[, group := .GRP, by = .(X, Y)] %>%
+    setnames("x", "geometry") %>%
     sf::st_as_sf()
+
+  # strips <-
+  #   sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
+  #   sf::st_as_sf() %>%
+  #   cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
+  #   dplyr::arrange(X) %>%
+  #   dplyr::mutate(group = 1:nrow(.)) %>%
+  #   sf::st_as_sf()
 
   vertical_line <-
     rbind(
