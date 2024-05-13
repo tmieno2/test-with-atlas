@@ -62,14 +62,13 @@ radius <-
     (f_bbox["xmax"] - f_bbox["xmin"])^2 +
       (f_bbox["ymax"] - f_bbox["ymin"])^2
   ) / 2 + 100
-
 ```
 
 ```{r}
 #--- create strips ---#
 #* only the angle of plot is used from plot_heading
-field = field_sf
-plot_width = harvester_width
+field <- field_sf
+plot_width <- harvester_width
 
 strips <-
   create_strips(field = field_sf, plot_heading, plot_width = harvester_width, radius) %>%

@@ -188,7 +188,7 @@ get_angle_lines <- function(line_1, line_2) {
 #+ Create strips
 #++++++++++++++++++++++++++++++++++++
 #' create strips
-#' 
+#'
 #' temp
 #' @param field er
 #' @param plot_heading rtge4
@@ -210,14 +210,56 @@ create_strips <- function(field, plot_heading, plot_width, radius) {
   #   setnames("x", "geometry") %>%
   #   sf::st_as_sf()
 
+  make_polygon <- function(base_point, strip_length, plot_width) {
+    point_0 <- base_point
+    point_1 <- point_0 + c(0, 1) * strip_length # go north
+    point_2 <- point_1 + c(1, 0) * plot_width
+    point_3 <- point_2 - c(0, 1) * strip_length
+    point_4 <- point_0
+
+    temp_polygon <- rbind(
+      point_0,
+      point_1,
+      point_2,
+      point_3,
+      point_4
+    ) %>%
+      list() %>%
+      sf::st_polygon()
+
+    return(temp_polygon)
+  }
+
+  circle_bbox <- st_bbox(circle)
+  num_strips <- ceiling((circle_bbox["xmax"] - circle_bbox["xmin"]) / plot_width)
+  strip_length <- circle_bbox["ymax"] - circle_bbox["ymin"]
+
   strips <-
-    sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
+    data.table(
+      x = circle_bbox["xmin"] + plot_width * 1:num_strips,
+      y = circle_bbox["ymin"]
+    ) %>%
+    rowwise() %>%
+    dplyr::mutate(base_point = list(
+      c(x, y)
+    )) %>%
+    dplyr::mutate(geometry = list(
+      make_polygon(base_point, strip_length, plot_width)
+    )) %>%
+    data.table() %>%
     sf::st_as_sf() %>%
-    cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
-    dplyr::arrange(X) %>%
-    dplyr::mutate(group = 1:nrow(.)) %>%
-    sf::st_as_sf() %>%
-    st_make_valid()
+    st_set_crs(st_crs(field)) %>%
+    dplyr::select(geometry) %>%
+    dplyr::mutate(group = 1:nrow(.))
+
+  # strips <-
+  #   sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
+  #   sf::st_as_sf() %>%
+  #   cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
+  #   dplyr::arrange(X) %>%
+  #   dplyr::mutate(group = 1:nrow(.)) %>%
+  #   sf::st_as_sf() %>%
+  #   st_make_valid()
 
   vertical_line <-
     rbind(
@@ -530,7 +572,6 @@ prepare_ablines <- function(ab_line, field, plot_width) {
 #* Make harvester (yield) polygons based on harvester ab-line
 #* +++++++++++++++++++++++++++++++++++
 make_harvest_path <- function(harvester_width, harvest_ab_line, field_sf) {
-
   base_ab_lines_data <-
     prepare_ablines(
       ab_line = harvest_ab_line,
