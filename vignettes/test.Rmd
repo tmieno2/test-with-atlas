@@ -1,0 +1,78 @@
+---
+title: "test"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{test}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(test.with.atlas)
+```
+
+```{r}
+library(data.table)
+data(td_single_input)
+
+td <- td_single_input
+
+checks <-
+  td %>%
+  dplyr::select(input_name, exp_plots, harvester_width, harvest_ab_lines, field_sf) %>%
+  tidyr::unnest(harvest_ab_lines) %>%
+  dplyr::rename(harvest_ab_line = x) %>%
+  dplyr::rowwise()
+
+input_name <- checks$input_name[[1]]
+exp_plots <- checks$exp_plots[[1]]
+harvest_ab_line <- checks$harvest_ab_line
+harvester_width <- checks$harvester_width[[1]]
+field_sf <- checks$field_sf[[1]]
+
+base_ab_lines_data <-
+  prepare_ablines(
+    ab_line = harvest_ab_line,
+    field = field_sf,
+    plot_width = harvester_width
+  )
+
+#--- ab-line tilted by harvester angle ---#
+plot_heading <- base_ab_lines_data$plot_heading
+#--- unit vector pointing in the direction the machine moves ---#
+ab_xy_nml <- base_ab_lines_data$ab_xy_nml
+#--- unit vector pointing in the direction PERPENDICULAR to the direction the machine moves ---#
+ab_xy_nml_p90 <- base_ab_lines_data$ab_xy_nml_p90
+
+#++++++++++++++++++++++++++++++++++++
+#+ Create strips
+#++++++++++++++++++++++++++++++++++++
+f_bbox <- sf::st_bbox(field_sf)
+
+#--- maximum distance ---#
+radius <-
+  sqrt(
+    (f_bbox["xmax"] - f_bbox["xmin"])^2 +
+      (f_bbox["ymax"] - f_bbox["ymin"])^2
+  ) / 2 + 100
+
+```
+
+```{r}
+#--- create strips ---#
+#* only the angle of plot is used from plot_heading
+field = field_sf
+plot_width = harvester_width
+
+strips <-
+  create_strips(field = field_sf, plot_heading, plot_width = harvester_width, radius) %>%
+  sf::st_make_valid()
+```
+

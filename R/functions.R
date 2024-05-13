@@ -6,6 +6,7 @@
 #' @param radius radius
 #' @returns sf
 #' @import sf
+#' @import data.table
 #' @export
 #' @examples
 #' 

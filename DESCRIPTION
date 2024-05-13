@@ -10,7 +10,16 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: 
-    sf
+    data.table,
+    dplyr,
+    magrittr,
+    sf,
+    tibble,
+    tidyr
 RoxygenNote: 7.3.1
 Depends: 
     R (>= 2.10)
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
