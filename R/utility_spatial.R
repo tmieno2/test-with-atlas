@@ -216,7 +216,8 @@ create_strips <- function(field, plot_heading, plot_width, radius) {
     cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
     dplyr::arrange(X) %>%
     dplyr::mutate(group = 1:nrow(.)) %>%
-    sf::st_as_sf()
+    sf::st_as_sf() %>%
+    st_make_valid()
 
   vertical_line <-
     rbind(
