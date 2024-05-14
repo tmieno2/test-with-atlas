@@ -261,23 +261,23 @@ create_strips <- function(field, plot_heading, plot_width, radius) {
   #   sf::st_as_sf() %>%
   #   st_make_valid()
 
-  vertical_line <-
-    rbind(
-      c(0, 0),
-      c(0, 10)
-    ) %>%
-    sf::st_linestring() %>%
-    sf::st_sfc() %>%
-    sf::st_set_crs(sf::st_crs(field)) %>%
-    sf::st_as_sf()
+  # vertical_line <-
+  #   rbind(
+  #     c(0, 0),
+  #     c(0, 10)
+  #   ) %>%
+  #   sf::st_linestring() %>%
+  #   sf::st_sfc() %>%
+  #   sf::st_set_crs(sf::st_crs(field)) %>%
+  #   sf::st_as_sf()
 
-  strips <-
-    st_tilt(
-      data_sf = strips,
-      angle = get_angle_lines(line_1 = plot_heading, line_2 = vertical_line),
-      base_sf = circle,
-      merge = TRUE
-    )
+  # strips <-
+  #   st_tilt(
+  #     data_sf = strips,
+  #     angle = get_angle_lines(line_1 = plot_heading, line_2 = vertical_line),
+  #     base_sf = circle,
+  #     merge = TRUE
+  #   )
 
   return(strips)
 }
