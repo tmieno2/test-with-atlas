@@ -37,6 +37,7 @@ harvest_ab_line <- checks$harvest_ab_line
 harvester_width <- checks$harvester_width[[1]]
 field_sf <- checks$field_sf[[1]]
 
+
 base_ab_lines_data <-
   prepare_ablines(
     ab_line = harvest_ab_line,
@@ -69,6 +70,12 @@ radius <-
 #* only the angle of plot is used from plot_heading
 field <- field_sf
 plot_width <- harvester_width
+
+# ggplot() +
+#   geom_sf(data = field) +
+#   geom_sf(data = strips)
+
+
 
 strips <-
   create_strips(field = field_sf, plot_heading, plot_width = harvester_width, radius) %>%

@@ -184,6 +184,31 @@ get_angle_lines <- function(line_1, line_2) {
   return(angle)
 }
 
+st_rotate <- function(x, radians) {
+  rot_matrix <- matrix(c(cos(radians), sin(radians), -sin(radians), cos(radians)), 2, 2)
+  crs <- st_crs(x)
+
+  center <- sf::st_centroid(sf::st_as_sfc(sf::st_bbox(x)))
+
+  x_rotated <- (sf::st_geometry(x) - center) * rot_matrix + center
+
+  # put new geometry in the same sf object
+  sf::st_geometry(x) <- x_rotated
+  # replace lost crs
+  sf::st_crs(x) <- crs
+  return(x)
+}
+
+rotate_mat_p90 <- matrix(
+  c(
+    cos(pi / 2),
+    sin(pi / 2),
+    -sin(pi / 2),
+    cos(pi / 2)
+  ),
+  nrow = 2
+)
+
 #++++++++++++++++++++++++++++++++++++
 #+ Create strips
 #++++++++++++++++++++++++++++++++++++
@@ -198,23 +223,40 @@ get_angle_lines <- function(line_1, line_2) {
 
 
 create_strips <- function(field, plot_heading, plot_width, radius) {
-  circle <- sf::st_buffer(st_centroid_quietly(field), radius)
+  field_centroid <- st_centroid_quietly(field)
+  circle <- sf::st_buffer(field_centroid, radius)
 
-  # strips <-
-  #   sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
-  #   sf::st_as_sf() %>%
-  #   cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
-  #   data.table() %>%
-  #   .[order(X), ] %>%
-  #   .[, group := .GRP, by = .(X, Y)] %>%
-  #   setnames("x", "geometry") %>%
-  #   sf::st_as_sf()
+  #++++++++++++++++++++++++++++++++++++
+  #+ get direction vectors
+  #++++++++++++++++++++++++++++++++++++
+  #--- get the vector (direction machines run)  ---#
+  ab_xy <- sf::st_geometry(plot_heading)[[1]][2, ] - sf::st_geometry(plot_heading)[[1]][1, ]
 
-  make_polygon <- function(base_point, strip_length, plot_width) {
-    point_0 <- base_point
-    point_1 <- point_0 + c(0, 1) * strip_length # go north
-    point_2 <- point_1 + c(1, 0) * plot_width
-    point_3 <- point_2 - c(0, 1) * strip_length
+  #--- distance of the vector ---#
+  ab_length <- sqrt(sum(ab_xy^2))
+
+  #--- normalize (distance == 1) ---#
+  ab_xy_nml <- ab_xy / ab_length
+
+  #--- create a vector that is perpendicular to ab_xy ---#
+  ab_xy_nml_p90 <- ab_xy_nml %*% rotate_mat_p90
+
+  #++++++++++++++++++++++++++++++++++++
+  #+ Get the line along which strips are created
+  #++++++++++++++++++++++++++++++++++++
+  field_centroid_xy <- st_coordinates(field_centroid)
+  starting_point <- field_centroid_xy + ab_xy_nml_p90 * radius * 2
+  end_point <- field_centroid_xy - ab_xy_nml_p90 * radius * 2
+
+  #++++++++++++++++++++++++++++++++++++
+  #+ Create strips
+  #++++++++++++++++++++++++++++++++++++
+
+  make_polygon <- function(base_point, radius, plot_width) {
+    point_0 <- base_point + ab_xy_nml * radius * 2
+    point_1 <- point_0 + ab_xy_nml_p90 * plot_width
+    point_2 <- point_1 - ab_xy_nml * radius * 4
+    point_3 <- point_2 - ab_xy_nml_p90 * plot_width
     point_4 <- point_0
 
     temp_polygon <- rbind(
@@ -225,59 +267,30 @@ create_strips <- function(field, plot_heading, plot_width, radius) {
       point_4
     ) %>%
       list() %>%
-      sf::st_polygon()
+      sf::st_polygon() %>%
+      st_sfc() %>%
+      st_as_sf()
 
     return(temp_polygon)
   }
 
-  circle_bbox <- st_bbox(circle)
-  num_strips <- ceiling((circle_bbox["xmax"] - circle_bbox["xmin"]) / plot_width)
-  strip_length <- circle_bbox["ymax"] - circle_bbox["ymin"]
+  num_strips <- ceiling(sqrt(sum((starting_point - end_point)^2)) / plot_width) + 1
+
+  base_points <-
+    rep(1, num_strips + 1) %*% starting_point - (0:num_strips) %*% ab_xy_nml_p90 * plot_width
 
   strips <-
-    data.table(
-      x = circle_bbox["xmin"] + plot_width * 1:num_strips,
-      y = circle_bbox["ymin"]
+    lapply(
+      1:nrow(base_points),
+      \(x) {
+        base_point <- base_points[x, ]
+        make_polygon(base_point, radius, plot_width)
+      }
     ) %>%
-    rowwise() %>%
-    dplyr::mutate(base_point = list(
-      c(x, y)
-    )) %>%
-    dplyr::mutate(geometry = list(
-      make_polygon(base_point, strip_length, plot_width)
-    )) %>%
-    data.table() %>%
-    sf::st_as_sf() %>%
+    rbindlist() %>%
+    st_as_sf() %>%
     st_set_crs(st_crs(field)) %>%
-    dplyr::select(geometry) %>%
-    dplyr::mutate(group = 1:nrow(.))
-
-  # strips <-
-  #   sf::st_make_grid(circle, cellsize = c(plot_width, radius * 2 + 50)) %>%
-  #   sf::st_as_sf() %>%
-  #   cbind(., sf::st_coordinates(st_centroid_quietly(.))) %>%
-  #   dplyr::arrange(X) %>%
-  #   dplyr::mutate(group = 1:nrow(.)) %>%
-  #   sf::st_as_sf() %>%
-  #   st_make_valid()
-
-  # vertical_line <-
-  #   rbind(
-  #     c(0, 0),
-  #     c(0, 10)
-  #   ) %>%
-  #   sf::st_linestring() %>%
-  #   sf::st_sfc() %>%
-  #   sf::st_set_crs(sf::st_crs(field)) %>%
-  #   sf::st_as_sf()
-
-  # strips <-
-  #   st_tilt(
-  #     data_sf = strips,
-  #     angle = get_angle_lines(line_1 = plot_heading, line_2 = vertical_line),
-  #     base_sf = circle,
-  #     merge = TRUE
-  #   )
+    .[field, ]
 
   return(strips)
 }
@@ -304,6 +317,24 @@ utm_zone <- function(long) {
   utm <- (floor((long + 180) / 6) %% 60) + 1
   return(utm)
 }
+
+#++++++++++++++++++++++++++++++++++++
+#+ Extend a line sf by the user-specified multiplier
+#++++++++++++++++++++++++++++++++++++
+st_extend_line_both_sides <- function(line, multiplier) {
+  new_line <- sf::st_geometry(line)[[1]]
+  starting_point <- new_line[1, ]
+  direction_vec <- new_line[2, ] - new_line[1, ]
+  new_line[2, ] <- starting_point + multiplier * direction_vec
+  new_line[1, ] <- starting_point - multiplier * direction_vec
+
+  return_line <-
+    sf::st_sfc(new_line) %>%
+    sf::st_set_crs(sf::st_crs(line))
+
+  return(return_line)
+}
+
 
 #++++++++++++++++++++++++++++++++++++
 #+ Move points inward
